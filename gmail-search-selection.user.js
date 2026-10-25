@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gmail 選字搜尋
 // @namespace    https://github.com/charles0506/gmail-search-userscript
-// @version      1.1.0
+// @version      1.1.1
 // @description  選取文字後按右鍵，游標旁出現「在 Gmail 搜尋」選項，點擊在新分頁用 Gmail 搜尋該文字
 // @author       charles0506
 // @match        *://*/*
@@ -33,7 +33,7 @@
       .item:hover { background: #3c4043; }
     }
     svg { width: 18px; height: 18px; flex: none; }
-    .q { max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+    .q { display: inline-block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-weight: 600; }
     @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   `;
   const ICON = '<svg viewBox="0 0 24 24"><path fill="#EA4335" d="M2 6.5v11A1.5 1.5 0 0 0 3.5 19H6V9.9l6 4.5 6-4.5V19h2.5a1.5 1.5 0 0 0 1.5-1.5v-11c0-1.9-2.2-3-3.7-1.8L12 9.6 5.7 4.7C4.2 3.5 2 4.6 2 6.5z"/></svg>';

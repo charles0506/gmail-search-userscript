@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Gmail 選字搜尋
 // @namespace    https://github.com/charles0506/gmail-search-userscript
-// @version      1.0.0
-// @description  選取文字後按右鍵，游標旁出現「Gmail 搜尋」按鈕，點擊在新分頁用 Gmail 搜尋該文字
+// @version      1.1.0
+// @description  選取文字後按右鍵，游標旁出現「在 Gmail 搜尋」選項，點擊在新分頁用 Gmail 搜尋該文字
 // @author       charles0506
 // @match        *://*/*
 // @exclude      https://mail.google.com/*
@@ -15,7 +15,30 @@
 (function () {
   'use strict';
 
-  let bubble = null;
+  const CSS = `
+    :host { all: initial; }
+    .item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px 8px 10px;
+      background: #fff; color: #202124;
+      border: 1px solid rgba(0,0,0,.12); border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,.2);
+      font: 13px/1.3 "Segoe UI","Microsoft JhengHei",system-ui,sans-serif;
+      cursor: pointer; user-select: none; white-space: nowrap;
+      animation: in .12s ease-out;
+    }
+    .item:hover { background: #f1f3f4; }
+    @media (prefers-color-scheme: dark) {
+      .item { background: #2d2e30; color: #e8eaed; border-color: rgba(255,255,255,.15); }
+      .item:hover { background: #3c4043; }
+    }
+    svg { width: 18px; height: 18px; flex: none; }
+    .q { max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+    @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  `;
+  const ICON = '<svg viewBox="0 0 24 24"><path fill="#EA4335" d="M2 6.5v11A1.5 1.5 0 0 0 3.5 19H6V9.9l6 4.5 6-4.5V19h2.5a1.5 1.5 0 0 0 1.5-1.5v-11c0-1.9-2.2-3-3.7-1.8L12 9.6 5.7 4.7C4.2 3.5 2 4.6 2 6.5z"/></svg>';
+
+  let host = null;
 
   function getSelectedText() {
     const el = document.activeElement;
@@ -28,63 +51,68 @@
     return (window.getSelection().toString() || '').trim();
   }
 
-  function hideBubble() {
-    if (bubble) {
-      bubble.remove();
-      bubble = null;
+  function hideMenu() {
+    if (host) {
+      host.remove();
+      host = null;
     }
   }
 
-  function showBubble(x, y, text) {
-    hideBubble();
-    bubble = document.createElement('div');
-    bubble.textContent = '🔍 Gmail 搜尋';
-    bubble.style.cssText = [
-      'position:fixed',
-      'z-index:2147483647',
-      'padding:6px 12px',
-      'background:#d93025',
-      'color:#fff',
-      'font:14px/1.2 -apple-system,"Segoe UI","Microsoft JhengHei",sans-serif',
-      'border-radius:16px',
-      'box-shadow:0 2px 8px rgba(0,0,0,.35)',
-      'cursor:pointer',
-      'user-select:none',
-      'white-space:nowrap'
-    ].join(';');
-    document.documentElement.appendChild(bubble);
+  function showMenu(x, y, text) {
+    hideMenu();
+    host = document.createElement('div');
+    host.style.cssText = 'position:fixed;z-index:2147483647;left:0;top:0;display:block;';
+    const root = host.attachShadow({ mode: 'closed' });
 
-    // 放在游標左上方，避免被原生右鍵選單（往右下展開）蓋住
-    const w = bubble.offsetWidth;
-    const left = Math.max(4, Math.min(x - w - 8, window.innerWidth - w - 4));
-    const top = Math.max(4, y - 40);
-    bubble.style.left = left + 'px';
-    bubble.style.top = top + 'px';
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = ICON;
+    const label = document.createElement('span');
+    label.append('在 Gmail 搜尋 ');
+    const q = document.createElement('span');
+    q.className = 'q';
+    q.textContent = '「' + text + '」';
+    label.append(q);
+    item.append(label);
+    root.append(style, item);
+    document.documentElement.appendChild(host);
+
+    // 優先放游標上方（原生右鍵選單往下展開，不會被蓋住）；上方沒空間就放左側
+    const r = item.getBoundingClientRect();
+    let left = Math.min(Math.max(4, x), window.innerWidth - r.width - 4);
+    let top = y - r.height - 10;
+    if (top < 4) {
+      left = Math.max(4, x - r.width - 10);
+      top = Math.min(y, window.innerHeight - r.height - 4);
+    }
+    host.style.left = left + 'px';
+    host.style.top = top + 'px';
 
     // mousedown 就觸發，避免點擊先讓選取消失
-    bubble.addEventListener('mousedown', function (ev) {
+    item.addEventListener('mousedown', function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      const url = 'https://mail.google.com/mail/u/0/#search/' + encodeURIComponent(text);
-      GM_openInTab(url, { active: true });
-      hideBubble();
+      GM_openInTab('https://mail.google.com/mail/u/0/#search/' + encodeURIComponent(text), { active: true });
+      hideMenu();
     });
   }
 
   document.addEventListener('contextmenu', function (e) {
     const text = getSelectedText();
     if (!text) {
-      hideBubble();
+      hideMenu();
       return;
     }
-    showBubble(e.clientX, e.clientY, text);
+    showMenu(e.clientX, e.clientY, text);
   }, true);
 
   document.addEventListener('mousedown', function (e) {
-    if (bubble && !bubble.contains(e.target)) hideBubble();
+    if (host && e.target !== host) hideMenu();
   }, true);
-  document.addEventListener('keydown', hideBubble, true);
-  window.addEventListener('scroll', hideBubble, true);
-  window.addEventListener('resize', hideBubble);
-  window.addEventListener('blur', hideBubble);
+  document.addEventListener('keydown', hideMenu, true);
+  window.addEventListener('scroll', hideMenu, true);
+  window.addEventListener('resize', hideMenu);
+  window.addEventListener('blur', hideMenu);
 })();
